@@ -4,9 +4,6 @@
 
 MemGuard Vision is a custom memory allocator interceptor built in C++. It globally tracks `new` and `delete` calls, injects canary values around allocations to catch buffer overflows, detects memory leaks, and streams memory events as JSON.
 
-This repository currently contains **Phase 1** (The C++ Core Engine).
-*Phase 2 (The 3D Web Dashboard & WebSockets) is actively under development.*
-
 ---
 
 ## ✨ Features
