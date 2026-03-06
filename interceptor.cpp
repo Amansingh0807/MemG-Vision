@@ -68,6 +68,10 @@ __declspec(thread) bool MemoryTracker::in_tracker_ = false;
 __thread bool MemoryTracker::in_tracker_ = false;
 #endif
 
+// WebSocket broadcast hook (NULL by default; set by mg_start_ws_server in
+// main).
+MgBroadcastFn g_mg_broadcast_fn = NULL;
+
 // =============================================================================
 //  mg_alloc()  –  Core allocation with canary injection
 // =============================================================================
