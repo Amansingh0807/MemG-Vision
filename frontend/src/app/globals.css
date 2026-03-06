@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --mg-bg: #05050a;
+  --mg-green: #00ff88;
+  --mg-red: #ff2255;
+  --mg-amber: #ffaa00;
+  --mg-blue: #00aaff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--mg-bg);
+  color: #c8d8f0;
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0, 255, 136, 0.3); border-radius: 2px; }
+
+/* Glass panel */
+.mg-panel {
+  background: rgba(8, 12, 24, 0.82);
+  border: 1px solid rgba(0, 255, 136, 0.12);
+  border-radius: 12px;
+  backdrop-filter: blur(16px);
+}
+
+/* Status tag */
+.tag-safe   { color: var(--mg-green); }
+.tag-breach { color: var(--mg-red);   }
+.tag-leak   { color: var(--mg-amber); }
+.tag-freed  { color: #5a7090;         }
+.tag-summary{ color: var(--mg-blue);  }
+
+/* Pulsing dot indicator */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.75); }
+}
+.pulse-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+
+/* Scanline overlay for retro feel */
+.scanlines {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.05) 2px,
+    rgba(0, 0, 0, 0.05) 4px
+  );
+  pointer-events: none;
+}
