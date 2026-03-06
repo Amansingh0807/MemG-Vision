@@ -1,236 +1,164 @@
-/**
- * =============================================================================
- *  MemGuard Vision – Phase 1 Demo Program
- *  main_demo.cpp
- * =============================================================================
+/*
+ * main_demo.cpp  –  Phase 2 Demo Driver
  *
- *  PURPOSE
- *  -------
- *  Exercises every code path in the MemGuard interceptor and prints the
- *  resulting JSON events to stdout.
+ * Starts a WebSocket server on port 9001 before running the Phase 1
+ * allocation scenarios.  Every JSON event that was previously just
+ * printf-ed is now also broadcast to the live 3D dashboard in real-time.
  *
- *  SCENARIOS
- *  ---------
- *  1. Normal allocation + free
- *  2. Array new / delete[]
- *  3. Deliberate buffer overflow (canary breach)
- *  4. Intentional memory leak (reported at exit)
- *  5. STL containers (std::string, std::vector)
- *  6. Concurrent allocations via Win32 threads
- *
- *  PORTABILITY
- *  -----------
- *  Threading uses CreateThread/WaitForSingleObject on Windows to avoid the
- *  C++11 <thread> dependency that old MinGW 32-bit does not support.
- *
- * =============================================================================
+ * Run the frontend (cd frontend && npm run dev) and then do:
+ *   .\memguard_demo_ws.exe
+ * Open http://localhost:3000 to watch the heap visualizer.
  */
 
-#include "memguard.hpp" /* must come first – pulls in platform headers     */
+/* Pull in ws_broadcaster FIRST so winsock2.h comes before windows.h */
+#include "ws_broadcaster.hpp"
 
 #include <stdio.h>
-#include <string.h> /* memset */
+#include <string.h>
 #include <string>
 #include <vector>
 
 
-/* ─── Scenario banner ────────────────────────────────────────────────────── */
-
+/* ---------------------------------------------------------------------- */
 static void section(const char *title) {
-  printf("\n// ════════════════════════════════════════════════\n");
-  printf("// SCENARIO: %s\n", title);
-  printf("// ════════════════════════════════════════════════\n");
+  printf("\n// ── SCENARIO: %s ──\n", title);
   fflush(stdout);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ======================================================================
    Scenario 1 – Normal alloc + free
-   ═══════════════════════════════════════════════════════════════════════════
- */
+   ====================================================================== */
 static void scenario_normal_alloc_free() {
   section("1 – Normal alloc + free");
-
   int *p = new int(42);
-  /* Expected JSON:
-   * {"action":"alloc","address":"0x...","size":4,"status":"safe",...} */
-
   printf("// [C++]  *p = %d\n", *p);
   fflush(stdout);
-
   delete p;
-  /* Expected JSON:
-   * {"action":"free","address":"0x...","size":4,"status":"freed",...} */
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ======================================================================
    Scenario 2 – Array new / delete[]
-   ═══════════════════════════════════════════════════════════════════════════
- */
+   ====================================================================== */
 static void scenario_array_alloc_free() {
   section("2 – Array alloc + free");
-
-  /* 16 doubles = 128 bytes */
   double *arr = new double[16];
-  memset(arr, 0, 16 * sizeof(double));
-  arr[0] = 3.14;
-  arr[15] = 2.71;
+  for (int i = 0; i < 16; i++)
+    arr[i] = (double)i * 3.14;
   printf("// [C++]  arr[0]=%.2f  arr[15]=%.2f\n", arr[0], arr[15]);
   fflush(stdout);
-
   delete[] arr;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Scenario 3 – Deliberate buffer overflow
-   ═══════════════════════════════════════════════════════════════════════════
- */
+/* ======================================================================
+   Scenario 3 – Buffer overflow (tail canary breach)
+   ====================================================================== */
 static void scenario_buffer_overflow() {
   section("3 – Buffer Overflow (Canary Breach)");
-
-  /*
-   * Layout reminder:
-   *   [size_hdr 8B][HEAD_CANARY 8B][user payload 16B][TAIL_CANARY 8B]
-   *                                 ↑
-   *                                 buf  (what the caller sees)
-   *
-   * Writing memset(buf+16, 0xFF, 8) overwrites the TAIL canary.
-   */
   char *buf = new char[16];
-  memset(buf, 'A', 16); /* safe write – fill all 16 legitimate bytes */
-
-  printf("// [C++]  About to overflow 8 bytes past end of 16-byte buffer!\n");
+  memset(buf, 'A', 16);
+  printf("// [C++]  About to overflow 8 bytes past end of 16-byte buffer...\n");
   fflush(stdout);
-
-  /* ⚠ INTENTIONAL OVERFLOW – educational demonstration only! */
-  memset(buf + 16, 0xFF, 8); /* zaps the TAIL canary                    */
-
+  memset(buf + 16, 0xFF, 8); /* intentional overflow – demo only! */
   delete[] buf;
-  /* Expected JSON:
-   * {"action":"breach",...,"status":"breach","breach_detail":"..."} */
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ======================================================================
    Scenario 4 – Intentional memory leak
-   ═══════════════════════════════════════════════════════════════════════════
- */
+   ====================================================================== */
 static void scenario_leak() {
-  section("4 – Intentional Memory Leak (visible at program exit)");
-
+  section("4 – Intentional Memory Leak (reported at exit)");
   char *secret = new char[256];
   memset(secret, 0xCC, 256);
-
-  printf("// [C++]  Allocated 256 bytes at %p – deliberately leaked.\n",
-         (void *)secret);
-  printf("// The leak will appear in the summary JSON when main() returns.\n");
+  printf("// [C++]  Leaked 256 bytes at %p – not freed.\n", (void *)secret);
   fflush(stdout);
-
-  /* secret is intentionally NOT freed */
   (void)secret;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Scenario 5 – STL containers (proves transparency of interception)
-   ═══════════════════════════════════════════════════════════════════════════
- */
+/* ======================================================================
+   Scenario 5 – STL containers
+   ====================================================================== */
 static void scenario_stl_containers() {
   section("5 – STL Containers (std::string, std::vector)");
-
   {
-    /* std::string heap-allocates when the string > SSO threshold (~15 B) */
     std::string s(64, 'X');
-    printf("// [C++]  std::string[0] = '%c'  (64-char string)\n", s[0]);
+    printf("// [C++]  std::string[0]='%c'  (64-char)\n", s[0]);
   }
-  /* Destructor → delete → JSON free event */
-
   {
     std::vector<int> v(32, 7);
-    printf("// [C++]  std::vector<int>[0] = %d  (32 elements)\n", v[0]);
+    printf("// [C++]  std::vector<int>[0]=%d  (32 elements)\n", v[0]);
   }
-  /* Destructor → delete[] → JSON free event */
+  fflush(stdout);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ======================================================================
    Scenario 6 – Concurrent allocations (Win32 threads)
-   ═══════════════════════════════════════════════════════════════════════════
- */
-
+   ====================================================================== */
 struct WorkerArgs {
-  int thread_id;
-  int iterations;
+  int id;
+  int iters;
 };
 
-/* Win32 thread function: must return DWORD and take LPVOID */
-static DWORD WINAPI thread_alloc_worker(LPVOID param) {
-  WorkerArgs *a = (WorkerArgs *)param;
-
-  for (int i = 0; i < a->iterations; ++i) {
-    size_t sz = (size_t)(64 * (a->thread_id + 1));
+static DWORD WINAPI thread_worker(LPVOID p) {
+  WorkerArgs *a = (WorkerArgs *)p;
+  for (int i = 0; i < a->iters; i++) {
+    size_t sz = (size_t)(64 * (a->id + 1));
     char *buf = new char[sz];
-    buf[0] = (char)('A' + a->thread_id);
-    buf[sz - 1] = (char)('a' + a->thread_id);
-    Sleep(1); /* tiny sleep to maximise interleaving */
+    buf[0] = (char)('A' + a->id);
+    Sleep(2);
     delete[] buf;
   }
   return 0;
 }
 
 static void scenario_multithreaded() {
-  section("6 – Multi-threaded Concurrent Allocations (4 threads × 5 iter)");
+  section("6 – Multi-threaded Concurrent Allocations (4 × 5)");
+  static const int N = 4, ITER = 5;
+  HANDLE handles[N];
+  WorkerArgs args[N];
 
-  static const int NUM_THREADS = 4;
-  static const int ITERATIONS = 5;
-
-  HANDLE handles[NUM_THREADS];
-  WorkerArgs args[NUM_THREADS];
-
-  for (int t = 0; t < NUM_THREADS; ++t) {
-    args[t].thread_id = t;
-    args[t].iterations = ITERATIONS;
-    handles[t] = CreateThread(NULL, /* default security attributes  */
-                              0,    /* default stack size           */
-                              thread_alloc_worker, /* thread function */
-                              &args[t], /* argument                     */
-                              0,        /* run immediately              */
-                              NULL      /* don't need thread ID         */
-    );
+  for (int t = 0; t < N; t++) {
+    args[t] = {t, ITER};
+    handles[t] = CreateThread(NULL, 0, thread_worker, &args[t], 0, NULL);
   }
-
-  /* Wait for all threads to finish */
-  WaitForMultipleObjects(NUM_THREADS, handles, TRUE /* wait all */, INFINITE);
-
-  for (int t = 0; t < NUM_THREADS; ++t)
+  WaitForMultipleObjects(N, handles, TRUE, INFINITE);
+  for (int t = 0; t < N; t++)
     CloseHandle(handles[t]);
-
-  printf("// [C++]  %d threads × %d iterations = %d alloc/free pairs.\n",
-         NUM_THREADS, ITERATIONS, NUM_THREADS * ITERATIONS);
+  printf("// [C++]  %d threads × %d iterations done.\n", N, ITER);
   fflush(stdout);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ======================================================================
    main()
-   ═══════════════════════════════════════════════════════════════════════════
- */
-
+   ====================================================================== */
 int main() {
-  printf("// ╔═══════════════════════════════════════════════════╗\n");
-  printf("// ║        MemGuard Vision – Phase 1 Demo             ║\n");
-  printf("// ║  Non-comment lines are valid JSON events.         ║\n");
-  printf("// ╚═══════════════════════════════════════════════════╝\n");
+  printf("// MemGuard Vision – Phase 2 Demo\n");
+  printf("// JSON events stream to console AND to ws://localhost:9001\n");
   fflush(stdout);
 
-  scenario_normal_alloc_free(); /* 1 */
-  scenario_array_alloc_free();  /* 2 */
-  scenario_buffer_overflow();   /* 3 – breach event */
-  scenario_stl_containers();    /* 5 – run before leak for cleaner output */
-  scenario_multithreaded();     /* 6 */
-  scenario_leak();              /* 4 – LAST: shows in exit summary */
+  /* Start WebSocket server first so the dashboard can connect before events
+   * begin */
+  mg_start_ws_server(9001);
 
-  printf("\n// All scenarios complete. Exiting...\n");
-  printf("// MemoryTracker destructor will now emit leak + summary JSON.\n");
+  printf("// Waiting 2s for dashboard to connect...\n");
   fflush(stdout);
+  Sleep(2000);
 
+  scenario_normal_alloc_free();
+  Sleep(600);
+  scenario_array_alloc_free();
+  Sleep(600);
+  scenario_buffer_overflow();
+  Sleep(800);
+  scenario_stl_containers();
+  Sleep(600);
+  scenario_multithreaded();
+  Sleep(600);
+  scenario_leak(); /* intentional leak – exit triggers report */
+
+  printf(
+      "\n// All scenarios complete. Exiting (leak + summary JSON follows).\n");
+  fflush(stdout);
   return 0;
-  /* MemoryTracker::~MemoryTracker() fires here:
-     → leak_report events for scenario 4
-     → summary event with total_allocs / total_frees / leaks_found         */
+  /* MemoryTracker::~MemoryTracker() → leak_report + summary events fired here
+   */
 }
