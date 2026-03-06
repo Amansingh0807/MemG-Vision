@@ -1,0 +1,29 @@
+# Build artifacts
+build/
+*.exe
+*.o
+*.obj
+*.pdb
+*.ilk
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+.vs/
+out/
+
+# Log files
+*.log
+*error*.txt
+*out*.txt
+demo_*.txt
+
+# Node modules
+frontend/node_modules
+
+.env
+node_modules
