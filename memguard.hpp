@@ -141,6 +141,12 @@ inline void mg_record_init(AllocationRecord *r) {
   r->line = 0;
 }
 
+/* Optional WebSocket broadcast hook.
+ * Set g_mg_broadcast_fn to a function that sends text to the dashboard.
+ * Defined as NULL (defined in interceptor.cpp); set by ws_broadcaster.hpp. */
+typedef void (*MgBroadcastFn)(const char *json_text);
+extern MgBroadcastFn g_mg_broadcast_fn;
+
 /* ═══════════════════════════════════════════════════════════════════════════
    JSON / Formatting helpers
    ═══════════════════════════════════════════════════════════════════════════
@@ -191,19 +197,25 @@ inline std::string current_iso_timestamp() {
 inline void emit_json(const std::string &action, const std::string &address,
                       size_t size, const char *status,
                       const std::string &extra = "") {
-  /* Use %I64u on old MinGW/MSVC; %llu on GCC/Clang targeting 64-bit. */
+  char _ev[640];
 #if defined(__MINGW32__) && !defined(__MINGW64__)
-  printf("{\"action\":\"%s\",\"address\":\"%s\",\"size\":%I64u,"
-         "\"status\":\"%s\",\"timestamp\":\"%s\"%s}\n",
-         action.c_str(), address.c_str(), (unsigned long long)(size), status,
-         current_iso_timestamp().c_str(), extra.c_str());
+  snprintf(_ev, sizeof(_ev),
+           "{\"action\":\"%s\",\"address\":\"%s\",\"size\":%I64u,"
+           "\"status\":\"%s\",\"timestamp\":\"%s\"%s}\n",
+           action.c_str(), address.c_str(), (unsigned long long)(size), status,
+           current_iso_timestamp().c_str(), extra.c_str());
 #else
-  printf("{\"action\":\"%s\",\"address\":\"%s\",\"size\":%llu,"
-         "\"status\":\"%s\",\"timestamp\":\"%s\"%s}\n",
-         action.c_str(), address.c_str(), (unsigned long long)(size), status,
-         current_iso_timestamp().c_str(), extra.c_str());
+  snprintf(_ev, sizeof(_ev),
+           "{\"action\":\"%s\",\"address\":\"%s\",\"size\":%llu,"
+           "\"status\":\"%s\",\"timestamp\":\"%s\"%s}\n",
+           action.c_str(), address.c_str(), (unsigned long long)(size), status,
+           current_iso_timestamp().c_str(), extra.c_str());
 #endif
+  printf("%s", _ev);
   fflush(stdout);
+  /* forward to live dashboard if the WS hook is registered */
+  if (g_mg_broadcast_fn)
+    g_mg_broadcast_fn(_ev);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
