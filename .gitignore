@@ -6,7 +6,11 @@ build/
 *.pdb
 *.ilk
 
-# CMake files
+# Setup scripts (not part of source)
+commit_all.ps1
+
+
+# CMake generated files
 CMakeCache.txt
 CMakeFiles/
 Makefile
@@ -16,8 +20,19 @@ compile_commands.json
 .vs/
 out/
 
-# Log files
+# Log / temp files
 *.log
 *error*.txt
 *out*.txt
+build_ws_*.txt
 demo_*.txt
+
+# Node / Next.js
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel
+frontend/.env
+frontend/.env.local
+.next/

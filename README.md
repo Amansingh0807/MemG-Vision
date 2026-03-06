@@ -1,72 +1,162 @@
-# 🛡️ MemGuard Vision (Core Engine)
+# 🛡️ MemGuard Vision
 
-> **A real-time, low-overhead C++ memory tracker with visual telemetry.**
+> **A real-time, low-overhead C++ memory tracker with a live 3D web dashboard.**
 
-MemGuard Vision is a custom memory allocator interceptor built in C++. It globally tracks `new` and `delete` calls, injects canary values around allocations to catch buffer overflows, detects memory leaks, and streams memory events as JSON.
+MemGuard Vision globally intercepts every `new` and `delete` call in a C++ program, injects canary sentinels around every heap allocation, detects buffer overflows and memory leaks in-process, and streams all events as JSON through a WebSocket to a Next.js dashboard where you can watch your heap breathe in 3D.
 
 ---
 
 ## ✨ Features
 
-- **Global Interception**: Overrides standard `operator new` and `operator delete` across the entire application without needing to change your source code.
-- **Buffer Overflow Detection (Canaries)**: Injects unique 8-byte boundaries (`0xDEADBEEFDEADBEEF`) around every allocation. If the tail canary is overwritten, the breach is instantly flagged on `delete`.
-- **Zero-Dependency Core**: The core tracking engine has zero third-party dependencies and uses standard `map` and `mutex` implementations.
-- **Actionable JSON Telemetry**: Outputs clean JSON logs containing `alloc`, `free`, `breach`, and `leak_report` events.
-- **Thread-safe Registry**: Employs recursion-guarded, platform-agnostic synchronization (Win32 Critical Sections / POSIX pthreads) to track multithreaded allocations perfectly.
+| Feature | Description |
+|---|---|
+| **Global Interception** | Overrides `operator new` / `operator delete` across the entire program — no source changes required |
+| **Buffer Overflow Detection** | `0xDEADBEEFDEADBEEF` canary values border every allocation; a corrupted tail canary triggers an instant `breach` event |
+| **Memory Leak Detection** | Every un-freed block is reported with its size and age at program exit |
+| **Thread-safe Registry** | Win32 `CRITICAL_SECTION`-guarded allocation map with a per-thread re-entrancy guard |
+| **Zero-dependency WebSocket** | Inline SHA-1 + Base64, raw WinSock2 — no Boost, no Crow, no vcpkg |
+| **Live 3D Dashboard** | Next.js + vanilla Three.js heap grid; cubes animate in/out with color-coded status |
+| **Actionable JSON events** | `alloc`, `free`, `breach`, `leak_report`, `summary` — pipe them anywhere |
 
 ---
 
-## 🏗️ Architecture Layout
+## 🏗️ Memory Layout
 
-Every allocation is safely padded with metadata. On a 64-bit system, the layout adds exactly 24 bytes of overhead to ensure memory safety:
+Each allocation carries **24 bytes of overhead** on a 64-bit build:
 
-```text
-  [ Payload Size (8B) ]  ← Stores the requested block size
-  [ HEAD CANARY (8B)  ]  ← Sentinel value to prevent underflows
-  [ User Payload      ]  ← The actual usable memory returned to your app
-  [ TAIL CANARY (8B)  ]  ← Sentinel value to detect buffer overflows
 ```
-
----
-
-## 🚀 Building the Core
-
-The project uses CMake as its cross-platform build system. You can build it on Windows, macOS, or Linux. Minimum requirement is **C++11**.
-
-### Quick Start
-
-```bash
-# 1. Create a build directory
-mkdir build && cd build
-
-# 2. Generate the build files
-cmake ..
-
-# 3. Compile the project
-cmake --build . --config Release
-
-# 4. Run the demo
-./memguard_demo
+ ┌──────────────────┬──────────────────┬──────────────────┬──────────────────┐
+ │  Payload Size 8B │  HEAD CANARY  8B │  User Payload NB │  TAIL CANARY  8B │
+ └──────────────────┴──────────────────┴──────────────────┴──────────────────┘
+                                         ↑ pointer returned to caller
+ CANARY_VALUE = 0xDEADBEEFDEADBEEF
 ```
 
 ---
 
-## 📊 Example Output
+## 🚀 Running Locally
 
-When running the demo, the MemGuard engine will output logs like this:
+### Prerequisites
 
-**Normal Allocation:**
-```json
-{"action":"alloc","address":"0x9c1874","size":4,"status":"safe","timestamp":"2026-03-05T14:06:30"}
+| Tool | Minimum Version | Notes |
+|---|---|---|
+| **MinGW GCC** (Windows) | g++ 5+ | Must be on `PATH` at `C:\MinGW\bin\` |
+| **Node.js** | 18+ | For the Next.js dashboard |
+| **npm** | 9+ | Comes with Node.js |
+
+---
+
+### Step 1 — Build the C++ Backend
+
+Open a **PowerShell** or **Command Prompt** terminal and run:
+
+```powershell
+cd "C:\Users\<YOU>\Desktop\MemG Vision"
+
+# Note the & operator — required in PowerShell for quoted exe paths
+& "C:\MinGW\bin\g++.exe" -std=c++11 -Wall -o memguard_demo_ws.exe interceptor.cpp main_demo.cpp -lws2_32
 ```
 
-**Buffer Overflow Detected:**
-```json
-{"action":"breach","address":"0x9c7724","size":16,"status":"breach","timestamp":"2026-03-05T14:06:30","breach_detail":"canary overwritten - buffer overflow detected!"}
+No output = success. The executable `memguard_demo_ws.exe` will appear in the project root.
+
+---
+
+### Step 2 — Install & Start the Dashboard (first time)
+
+Open a **second terminal**:
+
+```powershell
+cd "C:\Users\<YOU>\Desktop\MemG Vision\frontend"
+
+npm install      # installs Next.js, Three.js, Tailwind etc.
+npm run dev      # starts at http://localhost:3000
 ```
 
-**Memory Leak Report (On Exit):**
-```json
-{"action":"leak_report","address":"0x9c16cc","size":256,"status":"leak","timestamp":"2026-03-05T14:06:31","file":"<unknown>","line":0,"age_seconds":0}
+> On subsequent runs you only need `npm run dev`.
+
+---
+
+### Step 3 — Run the C++ Demo
+
+Back in the **first terminal**:
+
+```powershell
+.\memguard_demo_ws.exe
+```
+
+Expected output:
+```
+[WS] Listening on ws://localhost:9001 — open the dashboard!
+// Waiting 2s for dashboard to connect...
+[WS] Client connected  (active=1)
+
+// ── SCENARIO: 1 – Normal alloc + free ──
+{"action":"alloc","address":"0x...","size":4,"status":"safe",...}
+{"action":"free","address":"0x...","size":4,"status":"freed",...}
+...
+{"action":"breach","address":"0x...","status":"breach","breach_detail":"canary overwritten - buffer overflow detected!"}
+...
+{"action":"leak_report","address":"0x...","size":256,"status":"leak",...}
 {"action":"summary","total_allocs":25,"total_frees":24,"leaks_found":1,"leaked_bytes":256}
 ```
+
+---
+
+### Step 4 — Watch the Heap Live
+
+Open **[http://localhost:3000](http://localhost:3000)** in your browser.
+
+| Visual | Meaning |
+|---|---|
+| 🟢 Green cube rising | Memory allocated (`alloc`) |
+| ⬇️ Cube fading out | Memory freed (`free`) |
+| 🔴 Red cube pulsing | Buffer overflow detected (`breach`) |
+| 🟡 Amber cube breathing | Memory leak — block not freed (`leak`) |
+
+**Controls:** drag to orbit · scroll to zoom
+
+---
+
+## 📊 Example JSON Output
+
+```json
+{"action":"alloc",  "address":"0x9c1874","size":4,  "status":"safe",   "timestamp":"..."}
+{"action":"free",   "address":"0x9c1874","size":4,  "status":"freed",  "timestamp":"..."}
+{"action":"breach", "address":"0x9c7724","size":16, "status":"breach", "timestamp":"...", "breach_detail":"canary overwritten - buffer overflow detected!"}
+{"action":"leak_report","address":"0x9c16cc","size":256,"status":"leak","file":"<unknown>","age_seconds":0}
+{"action":"summary","total_allocs":25,"total_frees":24,"leaks_found":1,"leaked_bytes":256}
+```
+
+---
+
+## 📂 Project Structure
+
+```
+MemG Vision/
+├── memguard.hpp          # Core tracker, canary logic, JSON emit + WS hook
+├── interceptor.cpp       # Global operator new/delete overloads
+├── main_demo.cpp         # 6-scenario demo driver
+├── ws_server.hpp         # Zero-dependency WebSocket server (SHA-1, Base64, WinSock2)
+├── ws_broadcaster.hpp    # Singleton that wires WsServer → memguard emit pipeline
+├── CMakeLists.txt        # Cross-platform CMake build
+└── frontend/
+    ├── src/
+    │   ├── app/
+    │   │   ├── page.tsx          # Main dashboard layout
+    │   │   └── globals.css       # Dark theme + Tailwind
+    │   ├── components/
+    │   │   ├── HeapCanvas.tsx    # Vanilla Three.js 3D heap scene
+    │   │   ├── StatsPanel.tsx    # Live metrics sidebar
+    │   │   └── EventLog.tsx      # Scrolling event stream
+    │   └── hooks/
+    │       └── useMemGuard.ts    # WebSocket → React state hook
+    └── package.json
+```
+
+---
+
+## 🗺️ Roadmap
+
+- [x] **Phase 1** — C++ core engine (canaries, JSON telemetry, leak detection)
+- [x] **Phase 2** — WebSocket bridge + live 3D Next.js dashboard
+- [ ] **Phase 3** — Per-file/line tracking via placement-new macro + SQLite history replay

@@ -49,6 +49,8 @@ set(MEMGUARD_SOURCES
 # memguard.hpp is header-only; add it so IDEs show it in the project tree
 set(MEMGUARD_HEADERS
     memguard.hpp
+    ws_server.hpp
+    ws_broadcaster.hpp
 )
 
 # ── Executable target ──────────────────────────────────────────────────────────
@@ -59,6 +61,12 @@ add_executable(memguard_demo
 
 # Keep the header file visible to the compiler without path shenanigans
 target_include_directories(memguard_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Link Winsock2 on Windows for the WebSocket server
+if(WIN32)
+    target_link_libraries(memguard_demo PRIVATE ws2_32)
+endif()
+
 
 # ── Compiler warnings & hardening flags ───────────────────────────────────────
 
