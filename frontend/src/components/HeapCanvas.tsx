@@ -3,249 +3,171 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import type { HeapBlock } from '@/hooks/useMemGuard'
 
-/* ── Constants ─────────────────────────────────────────────────────── */
-const STATUS_HEX: Record<string, number> = {
-  safe:   0x00ff88,
-  breach: 0xff2255,
-  leak:   0xffaa00,
-  freed:  0x1a2840,
-}
-const EMISSIVE_HEX: Record<string, number> = {
-  safe:   0x003322,
-  breach: 0x440011,
-  leak:   0x332200,
-  freed:  0x000000,
-}
-const GRID_SIZE    = 10
-const GRID_SPACING = 1.2
-const TOTAL_CELLS  = GRID_SIZE * GRID_SIZE
+const STATUS_COLOR: Record<string, number>   = { safe: 0x00ff99, breach: 0xff1a4e, leak: 0xffbb00, freed: 0x0d2040 }
+const STATUS_EMISS: Record<string, number>   = { safe: 0x003322, breach: 0x500010, leak: 0x3d2d00, freed: 0x000000 }
+const GRID = 10, GAP = 1.22, CELLS = GRID * GRID
+const CENTER = ((GRID - 1) * GAP) / 2
 
-function addrToIndex(address: string): number {
-  let h = 0
-  for (let i = 0; i < address.length; i++)
-    h = (h * 31 + address.charCodeAt(i)) >>> 0
-  return h % TOTAL_CELLS
-}
-
-/* ── Shared box geometry (one instance for all blocks) ─────────────── */
 let sharedGeom: THREE.BoxGeometry | null = null
-function getGeom() {
-  if (!sharedGeom) sharedGeom = new THREE.BoxGeometry(0.85, 1, 0.85)
-  return sharedGeom
+const geom = () => { if (!sharedGeom) sharedGeom = new THREE.BoxGeometry(0.84, 1, 0.84); return sharedGeom }
+
+function addrHash(addr: string) {
+  let h = 0x811c9dc5
+  for (let i = 0; i < addr.length; i++) h = Math.imul(h ^ addr.charCodeAt(i), 0x01000193)
+  return (h >>> 0) % CELLS
 }
 
-/* ── Component ─────────────────────────────────────────────────────── */
 export default function HeapCanvas({ blocks }: { blocks: Map<string, HeapBlock> }) {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const wrap = useRef<HTMLDivElement>(null)
+  const meshMap  = useRef<Map<string, THREE.Mesh>>(new Map())
+  const renderer = useRef<THREE.WebGLRenderer | null>(null)
+  const scene    = useRef<THREE.Scene | null>(null)
+  const camera   = useRef<THREE.PerspectiveCamera | null>(null)
+  const raf      = useRef(0)
+  const drag     = useRef({ on: false, lx: 0, ly: 0 })
+  const sph      = useRef({ theta: 0.55, phi: 0.88, r: 19 })
+  const autoRot  = useRef(true)
 
-  /* Scene refs that persist across block updates */
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
-  const sceneRef    = useRef<THREE.Scene | null>(null)
-  const cameraRef   = useRef<THREE.PerspectiveCamera | null>(null)
-  const meshMapRef  = useRef<Map<string, THREE.Mesh>>(new Map())
-
-  /* Spherical camera state */
-  const spherical = useRef({ theta: 0.6, phi: 0.9, radius: 18 })
-  const drag      = useRef({ active: false, lastX: 0, lastY: 0 })
-
-  /* ── Initialize Three.js scene once ─────────────────────────────── */
+  /* ── Initialize Three.js ── */
   useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
+    const el = wrap.current; if (!el) return
 
-    /* Scene */
-    const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x05050a)
-    scene.fog = new THREE.FogExp2(0x05050a, 0.04)
-    sceneRef.current = scene
+    /* scene */
+    const sc = new THREE.Scene()
+    sc.background = new THREE.Color(0x070d1a)
+    sc.fog = new THREE.FogExp2(0x070d1a, 0.038)
+    scene.current = sc
 
-    /* Camera */
-    const W = container.clientWidth
-    const H = container.clientHeight
-    const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100)
-    cameraRef.current = camera
+    /* camera */
+    const cam = new THREE.PerspectiveCamera(44, el.clientWidth / el.clientHeight, 0.1, 80)
+    camera.current = cam
 
-    /* Renderer */
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setSize(W, H)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.shadowMap.enabled = true
-    container.appendChild(renderer.domElement)
-    rendererRef.current = renderer
+    /* renderer */
+    const rend = new THREE.WebGLRenderer({ antialias: true, alpha: false })
+    rend.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    rend.setSize(el.clientWidth || 800, el.clientHeight || 600)
+    rend.shadowMap.enabled = true
+    rend.shadowMap.type    = THREE.PCFSoftShadowMap
+    el.appendChild(rend.domElement)
+    renderer.current = rend
 
-    /* Lights */
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5))
-    const dir = new THREE.DirectionalLight(0xffffff, 1.2)
-    dir.position.set(8, 14, 8); dir.castShadow = true
-    scene.add(dir)
-    const pt = new THREE.PointLight(0x00ff88, 1.2, 25)
-    pt.position.set(0, 10, 0)
-    scene.add(pt)
+    /* lights */
+    sc.add(new THREE.AmbientLight(0x1a3060, 1.8))
+    const dir = new THREE.DirectionalLight(0xffffff, 1.4)
+    dir.position.set(10, 18, 10); dir.castShadow = true
+    dir.shadow.mapSize.width = dir.shadow.mapSize.height = 1024
+    sc.add(dir)
+    const ptGreen = new THREE.PointLight(0x00ff99, 1.8, 20)
+    ptGreen.position.set(0, 12, 0); sc.add(ptGreen)
+    const ptBlue  = new THREE.PointLight(0x0066ff, 1.0, 18)
+    ptBlue.position.set(-8, 6, -8); sc.add(ptBlue)
 
-    /* Floor + grid */
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(16, 16),
-      new THREE.MeshStandardMaterial({ color: 0x060c18, roughness: 1 })
-    )
-    floor.rotation.x = -Math.PI / 2
-    floor.receiveShadow = true
-    scene.add(floor)
-    scene.add(new THREE.GridHelper(16, 22, 0x0a2040, 0x0a2040))
+    /* floor */
+    const floorM = new THREE.MeshStandardMaterial({ color: 0x050b18, roughness: 1 })
+    const floor  = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), floorM)
+    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; sc.add(floor)
 
-    /* ── Mouse orbit ─────────────────────────────────────────────── */
-    const onDown = (e: MouseEvent) => {
-      drag.current = { active: true, lastX: e.clientX, lastY: e.clientY }
-    }
-    const onUp   = () => { drag.current.active = false }
+    /* grid lines */
+    const grid = new THREE.GridHelper(18, 24, 0x0a2a50, 0x071830)
+    grid.position.y = 0.01; sc.add(grid)
+
+    /* orbit controls (manual) */
+    const onDown = (e: MouseEvent) => { drag.current = { on: true, lx: e.clientX, ly: e.clientY }; autoRot.current = false }
+    const onUp   = () => { drag.current.on = false }
     const onMove = (e: MouseEvent) => {
-      if (!drag.current.active) return
-      const dx = e.clientX - drag.current.lastX
-      const dy = e.clientY - drag.current.lastY
-      spherical.current.theta -= dx * 0.005
-      spherical.current.phi   = Math.max(0.1, Math.min(Math.PI / 2.1, spherical.current.phi + dy * 0.005))
-      drag.current.lastX = e.clientX
-      drag.current.lastY = e.clientY
+      if (!drag.current.on) return
+      sph.current.theta -= (e.clientX - drag.current.lx) * 0.005
+      sph.current.phi    = Math.max(0.12, Math.min(1.45, sph.current.phi + (e.clientY - drag.current.ly) * 0.005))
+      drag.current.lx = e.clientX; drag.current.ly = e.clientY
     }
-    const onWheel = (e: WheelEvent) => {
-      spherical.current.radius = Math.max(5, Math.min(28, spherical.current.radius + e.deltaY * 0.02))
-    }
-    renderer.domElement.addEventListener('mousedown', onDown)
-    window.addEventListener('mouseup',   onUp)
+    const onWheel = (e: WheelEvent) => { sph.current.r = Math.max(5, Math.min(30, sph.current.r + e.deltaY * 0.025)) }
+    rend.domElement.addEventListener('mousedown', onDown)
+    window.addEventListener('mouseup', onUp)
     window.addEventListener('mousemove', onMove)
-    renderer.domElement.addEventListener('wheel', onWheel, { passive: true })
+    rend.domElement.addEventListener('wheel', onWheel, { passive: true })
 
-    /* ── Animation loop ─────────────────────────────────────────── */
+    /* animation */
     const clock = new THREE.Clock()
-    let frameId = 0
-    const animate = () => {
-      frameId = requestAnimationFrame(animate)
-      const t  = clock.getElapsedTime()
+    const tick = () => {
+      raf.current = requestAnimationFrame(tick)
+      const t = clock.getElapsedTime()
+      if (autoRot.current) sph.current.theta += 0.003
 
-      /* Update camera from spherical coords */
-      const { theta, phi, radius } = spherical.current
-      camera.position.set(
-        radius * Math.sin(phi) * Math.sin(theta),
-        radius * Math.cos(phi),
-        radius * Math.sin(phi) * Math.cos(theta),
-      )
-      camera.lookAt(0, 0, 0)
+      const { theta, phi, r } = sph.current
+      cam.position.set(r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.cos(theta))
+      cam.lookAt(0, 0, 0)
 
-      /* Animate each mesh */
-      meshMapRef.current.forEach((mesh) => {
-        const status  = mesh.userData.status as string
-        const targetH = (mesh.userData.targetH as number) ?? 1
-        const mat     = mesh.material as THREE.MeshStandardMaterial
-
-        /* Smooth height interpolation */
-        mesh.scale.y = THREE.MathUtils.lerp(mesh.scale.y, targetH, 0.09)
+      meshMap.current.forEach(mesh => {
+        const s   = mesh.userData.status as string
+        const tH  = (mesh.userData.targetH as number) ?? 1
+        const mat = mesh.material as THREE.MeshStandardMaterial
+        mesh.scale.y   = THREE.MathUtils.lerp(mesh.scale.y, tH, 0.1)
         mesh.position.y = mesh.scale.y * 0.5
-
-        /* Breach: rapid red pulse */
-        if (status === 'breach')
-          mat.emissiveIntensity = (Math.sin(t * 9) * 0.5 + 0.5) * 2.2
-
-        /* Leak: slow amber breathe */
-        if (status === 'leak')
-          mat.emissiveIntensity = 0.4 + Math.sin(t * 2.2) * 0.35
+        if (s === 'breach') mat.emissiveIntensity = 1.2 + Math.sin(t * 10) * 1.1
+        else if (s === 'leak') mat.emissiveIntensity = 0.5 + Math.sin(t * 2.5) * 0.35
+        if (s === 'freed') mat.opacity = Math.max(0, mat.opacity - 0.025)
       })
-
-      renderer.render(scene, camera)
+      rend.render(sc, cam)
     }
-    animate()
+    tick()
 
-    /* ── Resize handler ─────────────────────────────────────────── */
-    const onResize = () => {
-      const w = container.clientWidth, h = container.clientHeight
-      camera.aspect = w / h
-      camera.updateProjectionMatrix()
-      renderer.setSize(w, h)
-    }
-    window.addEventListener('resize', onResize)
+    /* resize */
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth, h = el.clientHeight
+      cam.aspect = w / h; cam.updateProjectionMatrix(); rend.setSize(w, h)
+    })
+    ro.observe(el)
+    ro.observe(document.body)
 
-    /* ── Cleanup ─────────────────────────────────────────────────── */
     return () => {
-      cancelAnimationFrame(frameId)
-      renderer.domElement.removeEventListener('mousedown', onDown)
-      window.removeEventListener('mouseup',   onUp)
-      window.removeEventListener('mousemove', onMove)
-      renderer.domElement.removeEventListener('wheel', onWheel)
-      window.removeEventListener('resize', onResize)
-      renderer.dispose()
-      if (container.contains(renderer.domElement))
-        container.removeChild(renderer.domElement)
-      rendererRef.current = null
-      sceneRef.current    = null
+      cancelAnimationFrame(raf.current)
+      rend.domElement.removeEventListener('mousedown', onDown)
+      window.removeEventListener('mouseup', onUp); window.removeEventListener('mousemove', onMove)
+      rend.domElement.removeEventListener('wheel', onWheel)
+      ro.disconnect(); rend.dispose()
+      if (el.contains(rend.domElement)) el.removeChild(rend.domElement)
     }
-  }, [])   // runs once
+  }, [])
 
-  /* ── Sync blocks → Three.js meshes (runs on every blocks update) ── */
+  /* ── Sync blocks → meshes ── */
   useEffect(() => {
-    const scene   = sceneRef.current
-    const meshMap = meshMapRef.current
-    if (!scene) return
-
-    const centerOffset = ((GRID_SIZE - 1) * GRID_SPACING) / 2
-
-    /* Add / update */
-    blocks.forEach((block, addr) => {
-      const color    = STATUS_HEX[block.status]   ?? 0xffffff
-      const emissive = EMISSIVE_HEX[block.status] ?? 0x000000
-      const targetH  = Math.max(0.2, Math.min(3.6, Math.log2(block.size + 1) * 0.38))
-
-      if (meshMap.has(addr)) {
-        /* Update existing mesh */
-        const mesh = meshMap.get(addr)!
-        const mat  = mesh.material as THREE.MeshStandardMaterial
-        mat.color.setHex(color)
-        mat.emissive.setHex(emissive)
-        mat.emissiveIntensity   = block.status === 'breach' ? 1.5 : block.status === 'leak' ? 0.6 : 0.25
-        mat.transparent         = block.status === 'freed'
-        mat.opacity             = block.status === 'freed' ? 0.35 : 1
-        mesh.userData.status    = block.status
-        mesh.userData.targetH   = targetH
+    const sc = scene.current; if (!sc) return
+    blocks.forEach((b, addr) => {
+      const color   = STATUS_COLOR[b.status] ?? 0xffffff
+      const emiss   = STATUS_EMISS[b.status] ?? 0
+      const targetH = Math.max(0.18, Math.min(4.2, Math.log2(b.size + 1) * 0.42))
+      if (meshMap.current.has(addr)) {
+        const m = meshMap.current.get(addr)!
+        const mat = m.material as THREE.MeshStandardMaterial
+        mat.color.setHex(color); mat.emissive.setHex(emiss)
+        mat.emissiveIntensity = b.status === 'breach' ? 1.8 : b.status === 'leak' ? 0.7 : 0.28
+        mat.transparent = b.status === 'freed'; mat.opacity = b.status === 'freed' ? 0.8 : 1
+        m.userData.status = b.status; m.userData.targetH = targetH
       } else {
-        /* Create new mesh */
-        const idx = addrToIndex(addr)
-        const col = idx % GRID_SIZE
-        const row = Math.floor(idx / GRID_SIZE)
-        const x   = col * GRID_SPACING - centerOffset
-        const z   = row * GRID_SPACING - centerOffset
-
+        const idx = addrHash(addr)
+        const x = (idx % GRID) * GAP - CENTER, z = Math.floor(idx / GRID) * GAP - CENTER
         const mat = new THREE.MeshStandardMaterial({
-          color:            new THREE.Color(color),
-          emissive:         new THREE.Color(emissive),
-          emissiveIntensity: block.status === 'breach' ? 1.5 : 0.25,
-          roughness:        0.4,
-          metalness:        0.35,
-          transparent:      block.status === 'freed',
-          opacity:          block.status === 'freed' ? 0.35 : 1,
+          color: new THREE.Color(color),
+          emissive: new THREE.Color(emiss),
+          emissiveIntensity: b.status === 'breach' ? 1.8 : 0.28,
+          roughness: 0.35, metalness: 0.4,
+          transparent: b.status === 'freed', opacity: b.status === 'freed' ? 0.6 : 1,
         })
-        const mesh = new THREE.Mesh(getGeom(), mat)
-        mesh.scale.y         = 0.01   // start flat, animates up
-        mesh.position.set(x, 0.005, z)
-        mesh.castShadow      = true
-        mesh.userData.status = block.status
-        mesh.userData.targetH = targetH
-        scene.add(mesh)
-        meshMap.set(addr, mesh)
+        const mesh = new THREE.Mesh(geom(), mat)
+        mesh.scale.y = 0.01; mesh.position.set(x, 0.005, z)
+        mesh.castShadow = true
+        mesh.userData = { status: b.status, targetH }
+        sc.add(mesh); meshMap.current.set(addr, mesh)
       }
     })
-
-    /* Remove blocks that are no longer in the map */
-    meshMap.forEach((mesh, addr) => {
+    meshMap.current.forEach((mesh, addr) => {
       if (!blocks.has(addr)) {
-        scene.remove(mesh)
+        scene.current?.remove(mesh)
         ;(mesh.material as THREE.MeshStandardMaterial).dispose()
-        meshMap.delete(addr)
+        meshMap.current.delete(addr)
       }
     })
   }, [blocks])
 
-  return (
-    <div
-      ref={containerRef}
-      className="w-full h-full cursor-grab active:cursor-grabbing"
-      style={{ touchAction: 'none' }}
-    />
-  )
+  return <div ref={wrap} style={{ position: 'absolute', inset: 0, cursor: 'grab' }} />
 }

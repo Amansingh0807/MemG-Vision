@@ -1,101 +1,117 @@
 'use client'
 import dynamic from 'next/dynamic'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import StatsPanel from '@/components/StatsPanel'
 import EventLog from '@/components/EventLog'
 import { useMemGuard } from '@/hooks/useMemGuard'
 
-// Three.js must be loaded client-side only (no SSR)
 const HeapCanvas = dynamic(() => import('@/components/HeapCanvas'), { ssr: false })
 
+const S = {
+  root: { width:'100vw', height:'100vh', background:'#070d1a', display:'flex', flexDirection:'column' as const, fontFamily:"'Inter', system-ui, sans-serif", color:'#b8d4f0', overflow:'hidden' },
+  header: { display:'flex', alignItems:'center', gap:16, padding:'0 18px', height:52, borderBottom:'1px solid rgba(0,180,255,.1)', flexShrink:0, background:'rgba(5,10,22,.9)' },
+  logo: { display:'flex', alignItems:'baseline', gap:4 },
+  main: { flex:1, display:'flex', gap:10, padding:10, minHeight:0 },
+  canvas: { flex:1, position:'relative' as const, borderRadius:10, overflow:'hidden', border:'1px solid rgba(0,180,255,.12)', background:'#070d1a' },
+  footer: { height:30, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', borderTop:'1px solid rgba(0,180,255,.08)', flexShrink:0, fontSize:10, fontFamily:"'JetBrains Mono',monospace", color:'#2a4060' },
+}
+
+function Badge({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div style={{ textAlign:'right' }}>
+      <div style={{ fontSize:9, fontFamily:"'JetBrains Mono',monospace", color:'#3a5878', letterSpacing:'0.1em', textTransform:'uppercase' }}>{label}</div>
+      <div style={{ fontSize:17, fontFamily:"'JetBrains Mono',monospace", fontWeight:700, color, lineHeight:1 }}>{value}</div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
-  const { connected, events, blocks, stats, connect } = useMemGuard('ws://localhost:9001')
+  const { connected, events, blocks, stats, sys, connect } = useMemGuard('ws://localhost:9001')
+  const [tick, setTick] = useState(0)
 
   useEffect(() => {
     const ws = connect()
     return () => ws?.close()
   }, [connect])
 
-  return (
-    <div className="h-screen w-screen flex flex-col bg-mg-bg overflow-hidden">
+  // re-render every 500ms for smooth stats
+  useEffect(() => { const id = setInterval(() => setTick(t => t + 1), 500); return () => clearInterval(id) }, [])
 
+  return (
+    <div style={S.root}>
       {/* ── Header ── */}
-      <header className="flex items-center gap-4 px-5 py-3 border-b border-mg-border shrink-0">
+      <header style={S.header}>
         {/* Logo */}
-        <div className="flex items-center gap-2">
-          <span className="text-mg-green font-mono font-bold text-lg tracking-tight">MEM</span>
-          <span className="text-mg-text font-mono font-light text-lg tracking-tight">GUARD</span>
-          <span className="text-mg-muted font-mono text-xs ml-1 self-end mb-0.5">VISION</span>
+        <div style={S.logo}>
+          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:700, fontSize:15, color:'#00d4ff', letterSpacing:'0.08em' }}>MEM</span>
+          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontWeight:300, fontSize:15, color:'#b8d4f0', letterSpacing:'0.08em' }}>GUARD</span>
+          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a5878', marginLeft:4, letterSpacing:'0.15em' }}>VISION</span>
         </div>
 
-        <div className="h-5 w-px bg-mg-border mx-2" />
+        <div style={{ width:1, height:22, background:'rgba(0,180,255,.15)' }} />
 
-        {/* Status indicator */}
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-2 h-2 rounded-full ${connected ? 'bg-mg-green pulse-dot' : 'bg-mg-muted'}`}
-          />
-          <span className="text-xs font-mono text-mg-muted">
-            {connected ? 'Connected · ws://localhost:9001' : 'Waiting for C++ backend…'}
+        {/* Connection status */}
+        <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+          <div className="dot-pulse" style={{ width:7, height:7, background: connected ? '#00ff99' : '#3a5878' }} />
+          <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color: connected ? '#00ff99' : '#3a5878' }}>
+            {connected ? 'CONNECTED · ws://localhost:9001' : 'WAITING FOR BACKEND…'}
           </span>
         </div>
 
-        {/* Quick stat badges */}
-        <div className="ml-auto flex items-center gap-4">
-          {[
-            { label: 'ALLOCS', value: stats.totalAllocs, color: '#00ff88' },
-            { label: 'FREES',  value: stats.totalFrees,  color: '#5a7090' },
-            { label: 'LEAKS',  value: stats.leaksFound,  color: '#ffaa00' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="text-right">
-              <p className="text-xs font-mono text-mg-muted">{label}</p>
-              <p className="font-mono font-bold text-base leading-none" style={{ color }}>{value}</p>
-            </div>
-          ))}
+        {/* Quick badges */}
+        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:20 }}>
+          <Badge label="Allocs"  value={stats.totalAllocs} color="#00ff99" />
+          <Badge label="Frees"   value={stats.totalFrees}  color="#3a5878" />
+          <Badge label="Blocks"  value={blocks.size}       color="#00d4ff" />
+          <Badge label="Leaks"   value={stats.leaksFound}  color={stats.leaksFound > 0 ? '#ffbb00' : '#3a5878'} />
         </div>
       </header>
 
-      {/* ── Main layout ── */}
-      <main className="flex-1 flex gap-3 p-3 min-h-0">
+      {/* ── Main ── */}
+      <main style={S.main}>
+        <StatsPanel stats={stats} liveBlocks={blocks.size} sys={sys} />
 
-        {/* Left: Stats */}
-        <StatsPanel stats={stats} liveBlocks={blocks.size} />
+        {/* Three.js canvas */}
+        <div style={S.canvas}>
+          {/* scan-line overlay */}
+          <div className="scanlines" style={{ position:'absolute', inset:0, zIndex:2, opacity:.25 }} />
 
-        {/* Center: 3D Canvas */}
-        <div className="flex-1 mg-panel overflow-hidden relative min-w-0">
-          {/* Scanlines overlay */}
-          <div className="absolute inset-0 scanlines z-10 pointer-events-none opacity-30" />
-
-          {/* Status overlay when not connected */}
+          {/* Not connected overlay */}
           {!connected && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center z-20 gap-3">
-              <div className="w-8 h-8 border-2 border-mg-green border-t-transparent rounded-full animate-spin" />
-              <p className="text-mg-muted text-sm font-mono">
-                Connecting to ws://localhost:9001
-              </p>
-              <p className="text-mg-muted text-xs font-mono opacity-60">
-                Run: <span className="text-mg-green">.\memguard_demo_ws.exe</span>
+            <div style={{ position:'absolute', inset:0, zIndex:10, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14 }}>
+              <div style={{ width:36, height:36, border:'2px solid #00d4ff', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 1s linear infinite' }} />
+              <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'#3a5878' }}>Connecting to ws://localhost:9001</p>
+              <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:'#1a3050' }}>
+                Run: <span style={{ color:'#00d4ff' }}>.\memguard_demo_ws.exe</span>{' '}or{' '}<span style={{ color:'#4488ff' }}>.\memguard_monitor.exe</span>
               </p>
             </div>
           )}
 
-          {/* Live block count badge */}
-          <div className="absolute top-3 right-3 z-20 mg-panel px-3 py-1.5 text-xs font-mono text-mg-muted">
-            <span className="text-mg-blue font-bold">{blocks.size}</span> live blocks
+          {/* Block count badge */}
+          <div className="panel" style={{ position:'absolute', top:12, right:12, zIndex:5, padding:'4px 10px', fontSize:11, fontFamily:"'JetBrains Mono',monospace", color:'#3a5878' }}>
+            <span style={{ color:'#00d4ff', fontWeight:600 }}>{blocks.size}</span> live blocks
+          </div>
+
+          {/* Canvas hint */}
+          <div style={{ position:'absolute', bottom:12, left:'50%', transform:'translateX(-50%)', zIndex:5, fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#1a3050' }}>
+            drag to orbit · scroll to zoom
           </div>
 
           <HeapCanvas blocks={blocks} />
         </div>
 
-        {/* Right: Event Log */}
         <EventLog events={events} />
       </main>
 
       {/* ── Footer ── */}
-      <footer className="px-5 py-2 border-t border-mg-border text-xs font-mono text-mg-muted flex justify-between shrink-0">
-        <span>MemGuard Vision · Phase 2 · Real-time Heap Monitor</span>
-        <span>Drag to orbit · Scroll to zoom · events: {events.length}</span>
+      <footer style={S.footer}>
+        <span>MemGuard Vision · Phase {sys ? '3' : '2'} · Real-time Heap + System Monitor</span>
+        <span>events: {events.length} · {new Date().toLocaleTimeString()}</span>
       </footer>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   )
 }
