@@ -18,7 +18,6 @@
 #include <string>
 #include <vector>
 
-
 /* ---------------------------------------------------------------------- */
 static void section(const char *title) {
   printf("\n// ── SCENARIO: %s ──\n", title);
@@ -131,18 +130,18 @@ static void scenario_multithreaded() {
    main()
    ====================================================================== */
 int main() {
-  printf("// MemGuard Vision – Phase 2 Demo\n");
-  printf("// JSON events stream to console AND to ws://localhost:9001\n");
+  printf("// MemGuard Vision – Demo + Live System Monitor\n");
+  printf("// Streaming to ws://localhost:9001\n");
+  printf("// Press Ctrl+C to stop.\n");
   fflush(stdout);
 
-  /* Start WebSocket server first so the dashboard can connect before events
-   * begin */
   mg_start_ws_server(9001);
 
   printf("// Waiting 2s for dashboard to connect...\n");
   fflush(stdout);
   Sleep(2000);
 
+  // ── Run the 6 demo scenarios ──────────────────────────────────────
   scenario_normal_alloc_free();
   Sleep(600);
   scenario_array_alloc_free();
@@ -153,12 +152,49 @@ int main() {
   Sleep(600);
   scenario_multithreaded();
   Sleep(600);
-  scenario_leak(); /* intentional leak – exit triggers report */
+  scenario_leak();
+  Sleep(600);
 
-  printf(
-      "\n// All scenarios complete. Exiting (leak + summary JSON follows).\n");
+  printf("\n// Demo complete. Now streaming live system RAM (Ctrl+C to "
+         "stop)...\n");
   fflush(stdout);
+
+  // ── Stay alive forever: stream real system memory every second ────
+  // Exactly like a Node.js server – runs until you hit Ctrl+C.
+  while (true) {
+    MEMORYSTATUSEX ms;
+    ms.dwLength = sizeof(ms);
+    GlobalMemoryStatusEx(&ms);
+
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    char ts[32] = "1970-01-01T00:00:00";
+    if (t)
+      snprintf(ts, sizeof(ts), "%04d-%02d-%02dT%02d:%02d:%02d",
+               t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour,
+               t->tm_min, t->tm_sec);
+
+    char buf[512];
+    snprintf(buf, sizeof(buf),
+             "{\"action\":\"sys_mem\","
+             "\"total_mb\":%I64u,"
+             "\"available_mb\":%I64u,"
+             "\"used_mb\":%I64u,"
+             "\"used_pct\":%lu,"
+             "\"status\":\"monitor\","
+             "\"timestamp\":\"%s\"}\n",
+             ms.ullTotalPhys / (1024ULL * 1024ULL),
+             ms.ullAvailPhys / (1024ULL * 1024ULL),
+             (ms.ullTotalPhys - ms.ullAvailPhys) / (1024ULL * 1024ULL),
+             (unsigned long)ms.dwMemoryLoad, ts);
+
+    printf("%s", buf);
+    fflush(stdout);
+    if (g_mg_broadcast_fn)
+      g_mg_broadcast_fn(buf);
+
+    Sleep(1000);
+  }
+
   return 0;
-  /* MemoryTracker::~MemoryTracker() → leak_report + summary events fired here
-   */
 }
