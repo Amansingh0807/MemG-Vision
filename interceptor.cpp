@@ -72,6 +72,13 @@ __thread bool MemoryTracker::in_tracker_ = false;
 // main).
 MgBroadcastFn g_mg_broadcast_fn = NULL;
 
+// JSONL persistence file (NULL = disabled; opened by mg_start_ws_server).
+FILE *g_mg_log_file = NULL;
+
+// Per-file/line source tracking thread-locals (set by MG_NEW macro).
+__thread const char *mg_src_file = "<unknown>";
+__thread int mg_src_line = 0;
+
 // =============================================================================
 //  mg_alloc()  –  Core allocation with canary injection
 // =============================================================================
@@ -131,8 +138,14 @@ static void *mg_alloc(std::size_t size, const char *file = "<unknown>",
   rec.user_ptr = user_ptr;
   rec.user_size = size;
   rec.timestamp = time(nullptr);
-  rec.file = file ? file : "<unknown>";
-  rec.line = line;
+
+  // Use thread-local source information (set by MG_NEW)
+  rec.file = mg_src_file;
+  rec.line = mg_src_line;
+
+  // Reset so subsequent allocations without MG_NEW don't inherit these
+  mg_src_file = "<unknown>";
+  mg_src_line = 0;
 
   MemoryTracker::instance().on_alloc(rec);
 

@@ -147,6 +147,30 @@ inline void mg_record_init(AllocationRecord *r) {
 typedef void (*MgBroadcastFn)(const char *json_text);
 extern MgBroadcastFn g_mg_broadcast_fn;
 
+/* ── JSONL persistence hook ──────────────────────────────────────────────
+ * When set, every emit_json() call also appends to this file so events are
+ * saved to memguard_history.jsonl for later replay.                       */
+extern FILE *g_mg_log_file;
+
+/* ── Per-file/line source tracking ─────────────────────────────────────
+ * Set these thread-locals with mg_set_source() (via MG_NEW macros) just
+ * before calling new/delete so on_alloc records the caller location.     */
+extern __thread const char *mg_src_file;
+extern __thread int mg_src_line;
+
+inline void mg_set_source(const char *f, int l) {
+  mg_src_file = f;
+  mg_src_line = l;
+}
+
+/* Convenience macros — use instead of plain new to get file+line in JSON.
+ *   int*   p = MG_NEW(int, 42);
+ *   char*  s = MG_NEW_ARR(char, 256); */
+#define MG_NEW(T, ...) (mg_set_source(__FILE__, __LINE__), new T(__VA_ARGS__))
+#define MG_NEW_ARR(T, n) (mg_set_source(__FILE__, __LINE__), new T[n])
+#define MG_DEL(ptr) (delete (ptr))
+#define MG_DEL_ARR(ptr) (delete[] (ptr))
+
 /* ═══════════════════════════════════════════════════════════════════════════
    JSON / Formatting helpers
    ═══════════════════════════════════════════════════════════════════════════
@@ -216,6 +240,11 @@ inline void emit_json(const std::string &action, const std::string &address,
   /* forward to live dashboard if the WS hook is registered */
   if (g_mg_broadcast_fn)
     g_mg_broadcast_fn(_ev);
+  /* persist to JSONL file if the log hook is open */
+  if (g_mg_log_file) {
+    fprintf(g_mg_log_file, "%s", _ev);
+    fflush(g_mg_log_file);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
