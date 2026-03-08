@@ -37,6 +37,9 @@ export default function DashboardPage() {
   // re-render every 500ms for smooth stats
   useEffect(() => { const id = setInterval(() => setTick(t => t + 1), 500); return () => clearInterval(id) }, [])
 
+  const [timeStr, setTimeStr] = useState('')
+  useEffect(() => { setTimeStr(new Date().toLocaleTimeString()) }, [tick])
+
   return (
     <div style={S.root}>
       {/* ── Header ── */}
@@ -82,7 +85,7 @@ export default function DashboardPage() {
               <div style={{ width:36, height:36, border:'2px solid #00d4ff', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 1s linear infinite' }} />
               <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:'#3a5878' }}>Connecting to ws://localhost:9001</p>
               <p style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:'#1a3050' }}>
-                Run: <span style={{ color:'#00d4ff' }}>.\memguard_demo_ws.exe</span>{' '}or{' '}<span style={{ color:'#4488ff' }}>.\memguard_monitor.exe</span>
+                Run: <span style={{ color:'#00d4ff' }}>.\memguard_demo_ws.exe</span>
               </p>
             </div>
           )}
@@ -106,7 +109,7 @@ export default function DashboardPage() {
       {/* ── Footer ── */}
       <footer style={S.footer}>
         <span>MemGuard Vision · Phase {sys ? '3' : '2'} · Real-time Heap + System Monitor</span>
-        <span>events: {events.length} · {new Date().toLocaleTimeString()}</span>
+        <span>events: {events.length} · {timeStr}</span>
       </footer>
 
       <style>{`
