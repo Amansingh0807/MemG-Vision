@@ -29,10 +29,10 @@ static void section(const char *title) {
    ====================================================================== */
 static void scenario_normal_alloc_free() {
   section("1 – Normal alloc + free");
-  int *p = new int(42);
+  int *p = MG_NEW(int, 42);
   printf("// [C++]  *p = %d\n", *p);
   fflush(stdout);
-  delete p;
+  MG_DEL(p);
 }
 
 /* ======================================================================
@@ -40,12 +40,12 @@ static void scenario_normal_alloc_free() {
    ====================================================================== */
 static void scenario_array_alloc_free() {
   section("2 – Array alloc + free");
-  double *arr = new double[16];
+  double *arr = MG_NEW_ARR(double, 16);
   for (int i = 0; i < 16; i++)
     arr[i] = (double)i * 3.14;
   printf("// [C++]  arr[0]=%.2f  arr[15]=%.2f\n", arr[0], arr[15]);
   fflush(stdout);
-  delete[] arr;
+  MG_DEL_ARR(arr);
 }
 
 /* ======================================================================
@@ -53,12 +53,12 @@ static void scenario_array_alloc_free() {
    ====================================================================== */
 static void scenario_buffer_overflow() {
   section("3 – Buffer Overflow (Canary Breach)");
-  char *buf = new char[16];
+  char *buf = MG_NEW_ARR(char, 16);
   memset(buf, 'A', 16);
   printf("// [C++]  About to overflow 8 bytes past end of 16-byte buffer...\n");
   fflush(stdout);
   memset(buf + 16, 0xFF, 8); /* intentional overflow – demo only! */
-  delete[] buf;
+  MG_DEL_ARR(buf);
 }
 
 /* ======================================================================
@@ -66,7 +66,7 @@ static void scenario_buffer_overflow() {
    ====================================================================== */
 static void scenario_leak() {
   section("4 – Intentional Memory Leak (reported at exit)");
-  char *secret = new char[256];
+  char *secret = MG_NEW_ARR(char, 256);
   memset(secret, 0xCC, 256);
   printf("// [C++]  Leaked 256 bytes at %p – not freed.\n", (void *)secret);
   fflush(stdout);
@@ -101,10 +101,10 @@ static DWORD WINAPI thread_worker(LPVOID p) {
   WorkerArgs *a = (WorkerArgs *)p;
   for (int i = 0; i < a->iters; i++) {
     size_t sz = (size_t)(64 * (a->id + 1));
-    char *buf = new char[sz];
+    char *buf = MG_NEW_ARR(char, sz);
     buf[0] = (char)('A' + a->id);
     Sleep(2);
-    delete[] buf;
+    MG_DEL_ARR(buf);
   }
   return 0;
 }
@@ -137,9 +137,12 @@ int main() {
 
   mg_start_ws_server(9001);
 
-  printf("// Waiting 2s for dashboard to connect...\n");
+  printf("\n// ========================================================\n");
+  printf("// Waiting for dashboard to connect. Open http://localhost:3000\n");
+  printf("// then press ENTER in this window to start the memory tests...\n");
+  printf("// ========================================================\n\n");
   fflush(stdout);
-  Sleep(2000);
+  getchar();
 
   // ── Run the 6 demo scenarios ──────────────────────────────────────
   scenario_normal_alloc_free();
