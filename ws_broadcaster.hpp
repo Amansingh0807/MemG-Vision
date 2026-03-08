@@ -14,7 +14,6 @@
 #include "memguard.hpp"  /* for g_mg_broadcast_fn typedef */
 #include "ws_server.hpp" /* brings in winsock2.h + windows.h in correct order */
 
-
 /* The single live server instance (NULL until mg_start_ws_server is called) */
 static WsServer *g_ws_server = NULL;
 
@@ -38,4 +37,8 @@ inline void mg_start_ws_server(int port) {
   g_ws_server = &server;
   server.start();
   g_mg_broadcast_fn = mg_ws_broadcast_handler;
+
+  if (!g_mg_log_file) {
+    g_mg_log_file = fopen("memguard_history.jsonl", "a");
+  }
 }
