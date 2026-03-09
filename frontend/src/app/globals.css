@@ -1,60 +1,74 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --c-bg:      #070d1a;
-  --c-surface: rgba(8, 16, 35, 0.92);
-  --c-border:  rgba(0, 180, 255, 0.14);
+  --c-bg:      #050810;
+  --c-surface: rgba(8, 14, 24, 0.85);
+  --c-border:  rgba(0, 180, 255, 0.20);
   --c-cyan:    #00d4ff;
-  --c-green:   #00ff99;
-  --c-red:     #ff1a4e;
-  --c-amber:   #ffbb00;
-  --c-blue:    #4488ff;
-  --c-freed:   #1e3a5f;
-  --c-text:    #b8d4f0;
-  --c-muted:   #3a5878;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --c-green:   #12e06c;
+  --c-red:     #ff1f4b;
+  --c-amber:   #ffc107;
+  --c-blue:    #3b82f6;
+  --c-freed:   #2a4b7c;
+  --c-text:    #d0e4f5;
+  --c-muted:   #5b7f9e;
+  
+  --font-mono: var(--font-vt323), 'Courier New', monospace;
+  --font-sans: var(--font-orbitron), system-ui, sans-serif;
 }
 
-html, body { width: 100%; height: 100%; overflow: hidden; background: var(--c-bg); color: var(--c-text); font-family: var(--font-sans); }
+html, body { 
+  width: 100%; height: 100%; overflow: hidden; 
+  background: var(--c-bg); color: var(--c-text); 
+  font-family: var(--font-sans); 
+}
 
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 2px; }
+h1, h2, h3, h4, header {
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.5); }
+::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background: var(--c-cyan); }
 
 /* ─── glass panel ─── */
 .panel {
   background: var(--c-surface);
   border: 1px solid var(--c-border);
-  border-radius: 10px;
-  backdrop-filter: blur(20px);
+  border-radius: 6px; 
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-/* ─── tag colors ─── */
-.tag-safe    { color: var(--c-green);  }
-.tag-breach  { color: var(--c-red);    }
-.tag-leak    { color: var(--c-amber);  }
-.tag-freed   { color: var(--c-muted);  }
-.tag-summary { color: var(--c-cyan);   }
-.tag-sys_mem { color: var(--c-blue);   }
+/* ─── tag colors with subtle highlights ─── */
+.tag-safe    { color: var(--c-green); text-shadow: 0 0 2px rgba(18, 224, 108, 0.4); }
+.tag-breach  { color: var(--c-red);   text-shadow: 0 0 2px rgba(255, 31, 75, 0.4); }
+.tag-leak    { color: var(--c-amber); text-shadow: 0 0 2px rgba(255, 193, 7, 0.4); }
+.tag-freed   { color: var(--c-muted); }
+.tag-summary { color: var(--c-cyan);  text-shadow: 0 0 2px rgba(0, 212, 255, 0.4); }
+.tag-sys_mem { color: var(--c-blue);  }
 
 /* ─── pulse dot ─── */
-@keyframes dot-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
-.dot-pulse { animation: dot-pulse 1.4s ease-in-out infinite; border-radius: 50%; }
+@keyframes dot-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.7)} }
+.dot-pulse { animation: dot-pulse 1.5s ease-in-out infinite; border-radius: 2px; }
 
 /* ─── scan-line overlay ─── */
 .scanlines {
-  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 4px);
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0, 212, 255, 0.03) 2px,rgba(0, 212, 255, 0.03) 4px);
   pointer-events: none;
 }
 
 /* ─── number ticker ─── */
 @keyframes count-up { from { transform: translateY(4px); opacity: 0 } to { transform: none; opacity: 1 } }
-.ticker { animation: count-up .2s ease-out; }
+.ticker { animation: count-up .15s ease-out; }
 
 /* ─── RAM bar ─── */
-.ram-bar-bg { background: rgba(0,180,255,.1); border-radius: 4px; overflow: hidden; height: 6px; }
-.ram-bar-fill { height: 100%; border-radius: 4px; transition: width .8s ease; background: linear-gradient(90deg, var(--c-cyan), var(--c-green)); }
+.ram-bar-bg { background: rgba(0,212,255,.1); border-radius: 2px; overflow: hidden; height: 8px; border: 1px solid rgba(0,212,255,0.2) }
+.ram-bar-fill { height: 100%; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); background: linear-gradient(90deg, var(--c-cyan), var(--c-green)); box-shadow: 0 0 10px var(--c-green); }
