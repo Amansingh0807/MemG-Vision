@@ -22,7 +22,7 @@ export default function HistoryPage() {
 
   if (loading) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b8d4f0', fontFamily: 'JetBrains Mono, monospace' }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b8d4f0', fontFamily: 'var(--font-mono)' }}>
         Loading history...
       </div>
     )
@@ -38,12 +38,12 @@ export default function HistoryPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, color: '#fff' }}>Session History</h1>
-          <div style={{ fontSize: 12, color: '#3a5878', fontFamily: 'JetBrains Mono, monospace', marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: '#3a5878', fontFamily: 'var(--font-mono)', marginTop: 8 }}>
             Replaying from memguard_history.jsonl
           </div>
         </div>
 
-        <Link href="/" style={{ padding: '8px 16px', background: 'rgba(0,180,255,.1)', color: '#00d4ff', borderRadius: 6, textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600 }}>
+        <Link href="/" style={{ padding: '8px 16px', background: 'rgba(0,180,255,.1)', color: '#00d4ff', borderRadius: 6, textDecoration: 'none', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
           ← Back to Live Dashboard
         </Link>
       </div>
@@ -51,19 +51,19 @@ export default function HistoryPage() {
       <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
         <div className="panel" style={{ padding: 16, flex: 1 }}>
           <div style={{ fontSize: 10, color: '#3a5878', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 4 }}>Total Recorded Events</div>
-          <div style={{ fontSize: 24, fontFamily: 'JetBrains Mono, monospace', color: '#b8d4f0', fontWeight: 600 }}>{events.length}</div>
+          <div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', color: '#b8d4f0', fontWeight: 600 }}>{events.length}</div>
         </div>
         <div className="panel" style={{ padding: 16, flex: 1 }}>
           <div style={{ fontSize: 10, color: '#3a5878', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 4 }}>Historical Allocs</div>
-          <div style={{ fontSize: 24, fontFamily: 'JetBrains Mono, monospace', color: '#00ff99', fontWeight: 600 }}>{totalAllocs}</div>
+          <div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', color: '#00ff99', fontWeight: 600 }}>{totalAllocs}</div>
         </div>
         <div className="panel" style={{ padding: 16, flex: 1 }}>
           <div style={{ fontSize: 10, color: '#3a5878', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 4 }}>Historical Frees</div>
-          <div style={{ fontSize: 24, fontFamily: 'JetBrains Mono, monospace', color: '#3a5878', fontWeight: 600 }}>{totalFrees}</div>
+          <div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', color: '#3a5878', fontWeight: 600 }}>{totalFrees}</div>
         </div>
         <div className="panel" style={{ padding: 16, flex: 1 }}>
           <div style={{ fontSize: 10, color: '#3a5878', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 4 }}>Recorded Breaches</div>
-          <div style={{ fontSize: 24, fontFamily: 'JetBrains Mono, monospace', color: totalBreaches > 0 ? '#ff1a4e' : '#3a5878', fontWeight: 600 }}>{totalBreaches}</div>
+          <div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', color: totalBreaches > 0 ? '#ff1a4e' : '#3a5878', fontWeight: 600 }}>{totalBreaches}</div>
         </div>
       </div>
 
@@ -86,7 +86,7 @@ export default function HistoryPage() {
             const color = isBreach ? '#ff1a4e' : isLeak ? '#ffbb00' : isAlloc ? '#00ff99' : '#3a5878'
             
             return (
-              <div key={i} className="log-row" style={{ display: 'grid', gridTemplateColumns: '160px 80px 100px 1fr auto', padding: '6px 8px', borderRadius: 4, alignItems: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+              <div key={i} className="log-row" style={{ display: 'grid', gridTemplateColumns: '160px 80px 100px 1fr auto', padding: '6px 8px', borderRadius: 4, alignItems: 'center', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                 <div style={{ color: '#3a5878' }}>{ev.timestamp.replace('T', ' ')}</div>
                 <div style={{ color }}>{ev.action}</div>
                 <div style={{ color: '#b8d4f0' }}>{ev.address}</div>
@@ -104,7 +104,7 @@ export default function HistoryPage() {
           })}
           
           {events.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: '#3a5878', fontFamily: 'JetBrains Mono, monospace' }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#3a5878', fontFamily: 'var(--font-mono)' }}>
               No history found. Run the C++ tracker to generate events.
             </div>
           )}
