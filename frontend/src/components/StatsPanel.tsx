@@ -15,10 +15,10 @@ function Bar({ pct }: { pct: number }) {
 function Metric({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
     <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,180,255,.08)' }}>
-      <div style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#3a5878', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+      <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: '#3a5878', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
         {label}
       </div>
-      <div style={{ fontSize: 20, fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, color: color ?? '#b8d4f0', lineHeight: 1 }}>
+      <div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', fontWeight: 600, color: color ?? '#b8d4f0', lineHeight: 1 }}>
         {value}
       </div>
     </div>
@@ -36,7 +36,7 @@ export default function StatsPanel({ stats, liveBlocks, sys }: { stats: Stats; l
     <div style={{ width: 220, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* App memory */}
       <div className="panel" style={{ overflow: 'hidden' }}>
-        <div style={{ padding: '8px 14px', borderBottom: '1px solid rgba(0,180,255,.08)', fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#3a5878', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+        <div style={{ padding: '8px 14px', borderBottom: '1px solid rgba(0,180,255,.08)', fontSize: 10, fontFamily: 'var(--font-mono)', color: '#3a5878', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
           App Memory
         </div>
         <Metric label="Total Allocs"  value={stats.totalAllocs}         color="#00ff99" />
@@ -50,24 +50,24 @@ export default function StatsPanel({ stats, liveBlocks, sys }: { stats: Stats; l
       {/* System RAM */}
       {sys ? (
         <div className="panel" style={{ padding: 14 }}>
-          <div style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#3a5878', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: '#3a5878', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>
             System RAM
           </div>
-          <div style={{ fontSize: 22, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: '#00d4ff', marginBottom: 6 }}>
+          <div style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#00d4ff', marginBottom: 6 }}>
             {sys.pct}%
           </div>
           <Bar pct={sys.pct} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#3a5878' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10, fontFamily: 'var(--font-mono)', color: '#3a5878' }}>
             <span>{sys.usedMb.toLocaleString()} MB used</span>
             <span>{sys.totalMb.toLocaleString()} MB total</span>
           </div>
         </div>
       ) : (
         <div className="panel" style={{ padding: 14 }}>
-          <div style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: '#3a5878', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
+          <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: '#3a5878', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
             System RAM
           </div>
-          <div style={{ fontSize: 11, color: '#2a4060', fontFamily: 'JetBrains Mono, monospace' }}>
+          <div style={{ fontSize: 11, color: '#2a4060', fontFamily: 'var(--font-mono)' }}>
             Run memguard_monitor.exe to see live system memory
           </div>
         </div>
