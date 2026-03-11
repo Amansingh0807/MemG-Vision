@@ -153,16 +153,6 @@ MemG Vision/
     └── src/hooks/
         └── useMemGuard.ts # Unified Websocket connection and state manager
 ```
-
----
-
-## 🗺️ Roadmap & Completion
-
-- [x] **Phase 1** — C++ Core Engine (canaries, JSON telemetry, leak detection)
-- [x] **Phase 2** — WebSocket Bridge + Live 3D Next.js Dashboard
-- [x] **Phase 3** — Per-file/line tracking macros (`MG_NEW`), persistent `JSONL` event logging, and a dedicated History review UI.
-- [x] **Phase 4** — Futuristic UI aesthetic overhaul (Orbitron, VT323, High-contrast dark mode).
-
 ---
 
 ## 🤝 How to Contribute
@@ -180,14 +170,3 @@ Contributions are what make the open source community such an amazing place to l
 - Expanding the frontend dashboard with more granular metrics (e.g., fragmentation charts).
 - Performance optimizations for high-throughput multi-threaded applications.
 
----
-
-## 📬 Contact
-
-If you have any questions, suggestions, or just want to chat about C++ and memory management, feel free to reach out!
-
-- **Email:** [Your Email Address]
-- **LinkedIn:** [Your LinkedIn Profile URL]
-- **Twitter / X:** [@YourUsername]
-
-**Project Link:** [https://github.com/your-username/memguard-vision](https://github.com/your-username/memguard-vision)
