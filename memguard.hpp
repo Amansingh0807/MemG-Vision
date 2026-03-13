@@ -204,6 +204,27 @@ inline std::string current_iso_timestamp() {
 }
 
 /**
+ * escape_json_string()
+ * --------------------
+ * Escapes characters that would break JSON formatting, particularly backslashes in Windows file paths.
+ */
+inline std::string escape_json_string(const std::string &s) {
+  std::ostringstream o;
+  for (size_t i = 0; i < s.length(); ++i) {
+    if (s[i] == '"') o << "\\\"";
+    else if (s[i] == '\\') o << "\\\\";
+    else if (s[i] == '\b') o << "\\b";
+    else if (s[i] == '\f') o << "\\f";
+    else if (s[i] == '\n') o << "\\n";
+    else if (s[i] == '\r') o << "\\r";
+    else if (s[i] == '\t') o << "\\t";
+    else if (s[i] >= 0 && s[i] <= 0x1f) { } /* drop other control chars */
+    else o << s[i];
+  }
+  return o.str();
+}
+
+/**
  * emit_json()
  * -----------
  * Immediately prints a single-line JSON event to stdout.
@@ -235,15 +256,17 @@ inline void emit_json(const std::string &action, const std::string &address,
            action.c_str(), address.c_str(), (unsigned long long)(size), status,
            current_iso_timestamp().c_str(), extra.c_str());
 #endif
+#ifdef MG_ENABLE_STDOUT
   printf("%s", _ev);
   fflush(stdout);
+#endif
   /* forward to live dashboard if the WS hook is registered */
   if (g_mg_broadcast_fn)
     g_mg_broadcast_fn(_ev);
   /* persist to JSONL file if the log hook is open */
   if (g_mg_log_file) {
     fprintf(g_mg_log_file, "%s", _ev);
-    fflush(g_mg_log_file);
+    // Removed fflush(g_mg_log_file) here to eliminate the massive I/O bottleneck
   }
 }
 
@@ -392,7 +415,7 @@ public:
       leak_bytes += (unsigned long long)(rec.user_size);
 
       std::ostringstream extra;
-      extra << ",\"file\":\"" << (rec.file ? rec.file : "?") << "\""
+      extra << ",\"file\":\"" << escape_json_string(rec.file ? rec.file : "?") << "\""
             << ",\"line\":" << rec.line
             << ",\"age_seconds\":" << (long)(time(NULL) - rec.timestamp);
 
@@ -403,6 +426,7 @@ public:
     MG_MUTEX_UNLOCK(&mutex_);
 
     /* Final summary */
+#ifdef MG_ENABLE_STDOUT
 #if defined(__MINGW32__) && !defined(__MINGW64__)
     printf(
         "{\"action\":\"summary\",\"total_allocs\":%I64u,\"total_frees\":%I64u,"
@@ -416,6 +440,7 @@ public:
            leak_count, leak_bytes);
 #endif
     fflush(stdout);
+#endif
   }
 
   /* ── Accessors ─────────────────────────────────────────────────────── */
