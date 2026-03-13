@@ -4,11 +4,12 @@ import type { Stats } from '@/hooks/useMemGuard'
 type SysInfo = { totalMb: number; usedMb: number; pct: number } | null
 
 function Bar({ pct }: { pct: number }) {
-  const color = pct > 80 ? '#ff1a4e' : pct > 60 ? '#ffbb00' : '#00d4ff'
+  const color = pct > 80 ? '#ff1a4e' : pct > 60 ? '#ffbb00' : '#00ff99'
   return (
-    <div className="ram-bar-bg" style={{ height: 5, background: 'rgba(0,180,255,.1)', borderRadius: 4, overflow: 'hidden' }}>
-      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width .8s ease' }} />
+    <div className="ram-bar-bg" style={{ height: 6, background: 'rgba(0,212,255,.1)', borderRadius: 4, overflow: 'hidden', boxShadow:'inset 0 1px 3px rgba(0,0,0,0.5)' }}>
+      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width .8s cubic-bezier(0.2, 0.8, 0.2, 1)', boxShadow:`0 0 10px ${color}` }} />
     </div>
+
   )
 }
 

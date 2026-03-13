@@ -16,15 +16,15 @@ function Row({ ev }: { ev: MemEvent }) {
   const ts  = ev.timestamp?.split('T')[1] ?? ''
   const addr = ev.address?.slice(0, 10) ?? '—'
   return (
-    <div style={{ display:'flex', gap:8, padding:'7px 12px', borderBottom:'1px solid rgba(0,40,80,.5)', transition:'background .15s' }}
-         onMouseEnter={e => (e.currentTarget.style.background='rgba(0,180,255,.05)')}
+    <div style={{ display:'flex', gap:8, padding:'7px 12px', borderBottom:'1px solid rgba(0,212,255,.1)', transition:'background .15s' }}
+         onMouseEnter={e => (e.currentTarget.style.background='rgba(0,212,255,.08)')}
          onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
-      <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color: c, width:72, flexShrink:0, paddingTop:1 }}>
+      <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color: c, width:72, flexShrink:0, paddingTop:1, textShadow:`0 0 5px ${c}` }}>
         {ev.action}
       </span>
       <div style={{ flex:1, minWidth:0 }}>
-        {ev.address && <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#2a4060' }}>{addr}</span>}
-        {(ev.size ?? 0) > 0 && <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#b8d4f0', marginLeft:6 }}>{ev.size}B</span>}
+        {ev.address && <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#3a5878' }}>{addr}</span>}
+        {(ev.size ?? 0) > 0 && <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#c8e4ff', marginLeft:6 }}>{ev.size}B</span>}
         {ev.action === 'sys_mem' && (
           <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#4488ff', marginLeft:4 }}>
             {(ev as any).used_mb}MB / {(ev as any).total_mb}MB ({(ev as any).used_pct}%)
@@ -37,7 +37,7 @@ function Row({ ev }: { ev: MemEvent }) {
           </p>
         )}
       </div>
-      <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#2a4060', flexShrink:0 }}>{ts}</span>
+      <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#3a5878', flexShrink:0 }}>{ts}</span>
     </div>
   )
 }
@@ -49,12 +49,12 @@ export default function EventLog({ events }: { events: MemEvent[] }) {
   return (
     <div className="panel" style={{ width:290, flexShrink:0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {/* header */}
-      <div style={{ padding:'8px 12px', borderBottom:'1px solid rgba(0,180,255,.08)', display:'flex', alignItems:'center', gap:8 }}>
-        <div className="dot-pulse" style={{ width:6, height:6, background:'#00ff99' }} />
-        <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#3a5878', letterSpacing:'0.12em', textTransform:'uppercase' }}>
+      <div style={{ padding:'8px 12px', borderBottom:'1px solid rgba(0,212,255,.15)', display:'flex', alignItems:'center', gap:8, background:'rgba(0,212,255,.05)' }}>
+        <div className="dot-pulse" style={{ width:6, height:6, background:'#00ff99', boxShadow:'0 0 8px #00ff99' }} />
+        <span style={{ fontFamily:'var(--font-mono)', fontSize:10, color:'#5b7f9e', letterSpacing:'0.12em', textTransform:'uppercase' }}>
           Event Stream
         </span>
-        <span style={{ marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'#2a4060' }}>
+        <span style={{ marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'#3a5878' }}>
           {events.length}
         </span>
       </div>
