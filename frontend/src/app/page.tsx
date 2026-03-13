@@ -8,12 +8,12 @@ import { useMemGuard } from '@/hooks/useMemGuard'
 const HeapCanvas = dynamic(() => import('@/components/HeapCanvas'), { ssr: false })
 
 const S = {
-  root: { width:'100vw', height:'100vh', background:'#070d1a', display:'flex', flexDirection:'column' as const, fontFamily:"var(--font-sans)", color:'#b8d4f0', overflow:'hidden' },
-  header: { display:'flex', alignItems:'center', gap:16, padding:'0 18px', height:52, borderBottom:'1px solid rgba(0,180,255,.1)', flexShrink:0, background:'rgba(5,10,22,.9)' },
+  root: { width:'100vw', height:'100vh', background:'#030508', display:'flex', flexDirection:'column' as const, fontFamily:"var(--font-sans)", color:'#c8e4ff', overflow:'hidden' },
+  header: { display:'flex', alignItems:'center', gap:16, padding:'0 18px', height:52, borderBottom:'1px solid rgba(0,212,255,.15)', flexShrink:0, background:'rgba(3,6,12,.95)', backdropFilter:'blur(8px)' },
   logo: { display:'flex', alignItems:'baseline', gap:4 },
-  main: { flex:1, display:'flex', gap:10, padding:10, minHeight:0 },
-  canvas: { flex:1, position:'relative' as const, borderRadius:10, overflow:'hidden', border:'1px solid rgba(0,180,255,.12)', background:'#070d1a' },
-  footer: { height:30, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', borderTop:'1px solid rgba(0,180,255,.08)', flexShrink:0, fontSize:10, fontFamily:"var(--font-mono)", color:'#2a4060' },
+  main: { flex:1, display:'flex', gap:12, padding:12, minHeight:0 },
+  canvas: { flex:1, position:'relative' as const, borderRadius:12, overflow:'hidden', border:'1px solid rgba(0,212,255,.15)', background:'#050a14', boxShadow:'inset 0 0 40px rgba(0,0,0,0.8)' },
+  footer: { height:30, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', borderTop:'1px solid rgba(0,212,255,.1)', flexShrink:0, fontSize:10, fontFamily:"var(--font-mono)", color:'#3a5878', background:'rgba(3,6,12,.9)' },
 }
 
 function Badge({ label, value, color }: { label: string; value: number; color: string }) {
