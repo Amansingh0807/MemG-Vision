@@ -4,8 +4,7 @@ import * as THREE from 'three'
 import type { HeapBlock } from '@/hooks/useMemGuard'
 
 const STATUS_COLOR: Record<string, number>   = { safe: 0x00ff99, breach: 0xff1a4e, leak: 0xffbb00, freed: 0x0d2040 }
-const STATUS_EMISS: Record<string, number>   = { safe: 0x003322, breach: 0x500010, leak: 0x3d2d00, freed: 0x000000 }
-const GRID = 10, GAP = 1.22, CELLS = GRID * GRID
+const GRID = 100, GAP = 1.22, CELLS = GRID * GRID
 const CENTER = ((GRID - 1) * GAP) / 2
 
 let sharedGeom: THREE.BoxGeometry | null = null
@@ -19,14 +18,18 @@ function addrHash(addr: string) {
 
 export default function HeapCanvas({ blocks }: { blocks: Map<string, HeapBlock> }) {
   const wrap = useRef<HTMLDivElement>(null)
-  const meshMap  = useRef<Map<string, THREE.Mesh>>(new Map())
+  
   const renderer = useRef<THREE.WebGLRenderer | null>(null)
   const scene    = useRef<THREE.Scene | null>(null)
   const camera   = useRef<THREE.PerspectiveCamera | null>(null)
   const raf      = useRef(0)
+  
   const drag     = useRef({ on: false, lx: 0, ly: 0 })
   const sph      = useRef({ theta: 0.55, phi: 0.88, r: 19 })
   const autoRot  = useRef(true)
+
+  const instMesh = useRef<THREE.InstancedMesh | null>(null)
+  const blockArray = useRef<HeapBlock[]>([])
 
   /* ── Initialize Three.js ── */
   useEffect(() => {
@@ -34,12 +37,12 @@ export default function HeapCanvas({ blocks }: { blocks: Map<string, HeapBlock> 
 
     /* scene */
     const sc = new THREE.Scene()
-    sc.background = new THREE.Color(0x070d1a)
-    sc.fog = new THREE.FogExp2(0x070d1a, 0.038)
+    sc.background = new THREE.Color(0x050a14) // Darker cyber aesthetic
+    sc.fog = new THREE.FogExp2(0x050a14, 0.038)
     scene.current = sc
 
     /* camera */
-    const cam = new THREE.PerspectiveCamera(44, el.clientWidth / el.clientHeight, 0.1, 80)
+    const cam = new THREE.PerspectiveCamera(44, el.clientWidth / el.clientHeight, 0.1, 150)
     camera.current = cam
 
     /* renderer */
@@ -52,24 +55,39 @@ export default function HeapCanvas({ blocks }: { blocks: Map<string, HeapBlock> 
     renderer.current = rend
 
     /* lights */
-    sc.add(new THREE.AmbientLight(0x1a3060, 1.8))
+    sc.add(new THREE.AmbientLight(0x1a3060, 2.0))
     const dir = new THREE.DirectionalLight(0xffffff, 1.4)
     dir.position.set(10, 18, 10); dir.castShadow = true
     dir.shadow.mapSize.width = dir.shadow.mapSize.height = 1024
     sc.add(dir)
-    const ptGreen = new THREE.PointLight(0x00ff99, 1.8, 20)
+    const ptGreen = new THREE.PointLight(0x00ff99, 2.5, 30)
     ptGreen.position.set(0, 12, 0); sc.add(ptGreen)
-    const ptBlue  = new THREE.PointLight(0x0066ff, 1.0, 18)
+    const ptBlue  = new THREE.PointLight(0x0066ff, 1.5, 25)
     ptBlue.position.set(-8, 6, -8); sc.add(ptBlue)
 
     /* floor */
-    const floorM = new THREE.MeshStandardMaterial({ color: 0x050b18, roughness: 1 })
-    const floor  = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), floorM)
+    const floorM = new THREE.MeshStandardMaterial({ color: 0x03060d, roughness: 1 })
+    const floor  = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), floorM)
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; sc.add(floor)
 
     /* grid lines */
-    const grid = new THREE.GridHelper(18, 24, 0x0a2a50, 0x071830)
+    const grid = new THREE.GridHelper(100, 100, 0x0a2a50, 0x051325)
     grid.position.y = 0.01; sc.add(grid)
+
+    /* Instanced Mesh setup - up to 100,000 blocks */
+    const maxInstances = 100000
+    const iMesh = new THREE.InstancedMesh(
+      geom(), 
+      new THREE.MeshStandardMaterial({
+        roughness: 0.35, metalness: 0.4,
+      }), 
+      maxInstances
+    )
+    iMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    iMesh.castShadow = true
+    iMesh.receiveShadow = true
+    sc.add(iMesh)
+    instMesh.current = iMesh
 
     /* orbit controls (manual) */
     const onDown = (e: MouseEvent) => { drag.current = { on: true, lx: e.clientX, ly: e.clientY }; autoRot.current = false }
@@ -80,7 +98,7 @@ export default function HeapCanvas({ blocks }: { blocks: Map<string, HeapBlock> 
       sph.current.phi    = Math.max(0.12, Math.min(1.45, sph.current.phi + (e.clientY - drag.current.ly) * 0.005))
       drag.current.lx = e.clientX; drag.current.ly = e.clientY
     }
-    const onWheel = (e: WheelEvent) => { sph.current.r = Math.max(5, Math.min(30, sph.current.r + e.deltaY * 0.025)) }
+    const onWheel = (e: WheelEvent) => { sph.current.r = Math.max(5, Math.min(80, sph.current.r + e.deltaY * 0.05)) }
     rend.domElement.addEventListener('mousedown', onDown)
     window.addEventListener('mouseup', onUp)
     window.addEventListener('mousemove', onMove)
@@ -88,6 +106,12 @@ export default function HeapCanvas({ blocks }: { blocks: Map<string, HeapBlock> 
 
     /* animation */
     const clock = new THREE.Clock()
+    const dummy = new THREE.Object3D()
+    const cObj = new THREE.Color()
+    
+    // Extracted array for block state tracking
+    const heights = new Float32Array(maxInstances)
+    
     const tick = () => {
       raf.current = requestAnimationFrame(tick)
       const t = clock.getElapsedTime()
@@ -97,16 +121,46 @@ export default function HeapCanvas({ blocks }: { blocks: Map<string, HeapBlock> 
       cam.position.set(r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.cos(theta))
       cam.lookAt(0, 0, 0)
 
-      meshMap.current.forEach(mesh => {
-        const s   = mesh.userData.status as string
-        const tH  = (mesh.userData.targetH as number) ?? 1
-        const mat = mesh.material as THREE.MeshStandardMaterial
-        mesh.scale.y   = THREE.MathUtils.lerp(mesh.scale.y, tH, 0.1)
-        mesh.position.y = mesh.scale.y * 0.5
-        if (s === 'breach') mat.emissiveIntensity = 1.2 + Math.sin(t * 10) * 1.1
-        else if (s === 'leak') mat.emissiveIntensity = 0.5 + Math.sin(t * 2.5) * 0.35
-        if (s === 'freed') mat.opacity = Math.max(0, mat.opacity - 0.025)
-      })
+      if (instMesh.current && blockArray.current) {
+         let count = 0
+         for (let i = 0; i < blockArray.current.length; i++) {
+           if (count >= maxInstances) break
+           const b = blockArray.current[i]
+           if (b.status === 'freed') continue // Or handle fading smoothly
+
+           const s = b.status
+           const colorHex = STATUS_COLOR[s] ?? 0xffffff
+           const targetH = Math.max(0.18, Math.min(4.2, Math.log2(b.size + 1) * 0.42))
+           
+           heights[i] = THREE.MathUtils.lerp(heights[i] || 0.01, targetH, 0.1)
+
+           const idx = addrHash(b.address)
+           const x = (idx % GRID) * GAP - CENTER
+           const z = Math.floor(idx / GRID) * GAP - CENTER
+
+           dummy.position.set(x, heights[i] * 0.5, z)
+           dummy.scale.set(1, heights[i], 1)
+           
+           // Pulse effect for breach/leak
+           let scaleFix = 1
+           if (s === 'breach') scaleFix = 1.0 + Math.sin(t * 10) * 0.15
+           else if (s === 'leak') scaleFix = 1.0 + Math.sin(t * 3) * 0.05
+           dummy.scale.multiplyScalar(scaleFix)
+           
+           dummy.updateMatrix()
+           instMesh.current.setMatrixAt(count, dummy.matrix)
+           
+           cObj.setHex(colorHex)
+           if (s === 'breach') cObj.lerp(new THREE.Color(0xffffff), Math.sin(t * 10) * 0.5 + 0.5)
+           instMesh.current.setColorAt(count, cObj)
+           
+           count++
+         }
+         instMesh.current.count = count
+         instMesh.current.instanceMatrix.needsUpdate = true
+         if (instMesh.current.instanceColor) instMesh.current.instanceColor.needsUpdate = true
+      }
+
       rend.render(sc, cam)
     }
     tick()
@@ -129,44 +183,10 @@ export default function HeapCanvas({ blocks }: { blocks: Map<string, HeapBlock> 
     }
   }, [])
 
-  /* ── Sync blocks → meshes ── */
+  /* ── Sync blocks → array ── */
   useEffect(() => {
-    const sc = scene.current; if (!sc) return
-    blocks.forEach((b, addr) => {
-      const color   = STATUS_COLOR[b.status] ?? 0xffffff
-      const emiss   = STATUS_EMISS[b.status] ?? 0
-      const targetH = Math.max(0.18, Math.min(4.2, Math.log2(b.size + 1) * 0.42))
-      if (meshMap.current.has(addr)) {
-        const m = meshMap.current.get(addr)!
-        const mat = m.material as THREE.MeshStandardMaterial
-        mat.color.setHex(color); mat.emissive.setHex(emiss)
-        mat.emissiveIntensity = b.status === 'breach' ? 1.8 : b.status === 'leak' ? 0.7 : 0.28
-        mat.transparent = b.status === 'freed'; mat.opacity = b.status === 'freed' ? 0.8 : 1
-        m.userData.status = b.status; m.userData.targetH = targetH
-      } else {
-        const idx = addrHash(addr)
-        const x = (idx % GRID) * GAP - CENTER, z = Math.floor(idx / GRID) * GAP - CENTER
-        const mat = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(color),
-          emissive: new THREE.Color(emiss),
-          emissiveIntensity: b.status === 'breach' ? 1.8 : 0.28,
-          roughness: 0.35, metalness: 0.4,
-          transparent: b.status === 'freed', opacity: b.status === 'freed' ? 0.6 : 1,
-        })
-        const mesh = new THREE.Mesh(geom(), mat)
-        mesh.scale.y = 0.01; mesh.position.set(x, 0.005, z)
-        mesh.castShadow = true
-        mesh.userData = { status: b.status, targetH }
-        sc.add(mesh); meshMap.current.set(addr, mesh)
-      }
-    })
-    meshMap.current.forEach((mesh, addr) => {
-      if (!blocks.has(addr)) {
-        scene.current?.remove(mesh)
-        ;(mesh.material as THREE.MeshStandardMaterial).dispose()
-        meshMap.current.delete(addr)
-      }
-    })
+    // Convert Map to Array for fast iteration by InstancedMesh
+    blockArray.current = Array.from(blocks.values())
   }, [blocks])
 
   return <div ref={wrap} style={{ position: 'absolute', inset: 0, cursor: 'grab' }} />
