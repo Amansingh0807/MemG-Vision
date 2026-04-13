@@ -6,6 +6,12 @@ MemGuard Vision globally intercepts every `new` and `delete` call in a C++ progr
 
 ---
 
+## 📸 Project Screenshot
+
+![MemG Vision Screenshot](https://raw.githubusercontent.com/Amansingh0807/MemG-Vision/master/Screenshot%202026-03-08%20132251.png)
+
+---
+
 ## 💡 Why This Was Built
 
 Memory management in C++ is notoriously difficult. Segfaults, buffer overflows, and memory leaks often happen silently, crashing applications hours after the problematic code was executed. Traditional tools like Valgrind or ASAN are incredibly powerful but often come with heavy performance penalties and produce dense, text-based logs that are hard to visualize.
